@@ -87,24 +87,6 @@ def rest_api_call (method, endpoint, data=None, ip=args.ip, user=args.user, pass
         'Accept': 'application/json'
     }
     
-    # Debug output for request
-    if debug:
-        print("\n" + "="*80)
-        print("API CALL DEBUG INFO")
-        print("="*80)
-        print(f"Method: {method}")
-        print(f"URL: {url}")
-        print(f"User: {user}")
-        print(f"Headers: {headers}")
-        if data:
-            print(f"\nRequest Body (first 3000 chars):")
-            body_preview = data[:3000] + "..." if len(data) > 3000 else data
-            print(body_preview)
-            print(f"\nBody Length: {len(data)} characters")
-        else:
-            print("\nRequest Body: None")
-        print("="*80 + "\n")
-    
     res = requests.request(
         method=method,
         url=url,
@@ -114,17 +96,32 @@ def rest_api_call (method, endpoint, data=None, ip=args.ip, user=args.user, pass
         verify=False
     )
     
-    # Debug output for response
-    if debug:
+    # Only show debug output if there's an error (non-200 status)
+    if debug and res.status_code != 200:
         print("\n" + "="*80)
-        print("API RESPONSE DEBUG INFO")
+        print("API CALL DEBUG INFO (ERROR DETECTED)")
         print("="*80)
+        print(f"Method: {method}")
+        print(f"URL: {url}")
+        print(f"User: {user}")
+        print(f"Headers: {headers}")
+        if data:
+            print(f"\nRequest Body (first 5000 chars):")
+            body_preview = data[:5000] + "..." if len(data) > 5000 else data
+            print(body_preview)
+            print(f"\nBody Length: {len(data)} characters")
+        else:
+            print("\nRequest Body: None")
+        
+        print("\n" + "-"*80)
+        print("API RESPONSE DEBUG INFO")
+        print("-"*80)
         print(f"Status Code: {res.status_code}")
         print(f"Reason: {res.reason}")
         if len(res.content) > 0:
-            print(f"\nResponse Content (first 3000 chars):")
+            print(f"\nResponse Content (first 5000 chars):")
             content_str = res.content.decode('utf-8')
-            content_preview = content_str[:3000] + "..." if len(content_str) > 3000 else content_str
+            content_preview = content_str[:5000] + "..." if len(content_str) > 5000 else content_str
             print(content_preview)
             print(f"\nContent Length: {len(res.content)} bytes")
         print("="*80 + "\n")
@@ -132,7 +129,8 @@ def rest_api_call (method, endpoint, data=None, ip=args.ip, user=args.user, pass
     try:
         res.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        if debug:
+        if debug and res.status_code == 200:
+            # Edge case: if we somehow get here with 200 status, show debug info
             print("\n" + "="*80)
             print("API ERROR DEBUG INFO")
             print("="*80)
@@ -243,10 +241,13 @@ def restore_nsx_dfw_services(backupfileprefix):
         rest_api_call(method='PATCH', endpoint = endpoint, data=body, debug=args.debug)
         print("\n   SUCCESS - NSX DFW L4 Services")
     except Exception as ex:
-        err_res_cont = json.loads(ex.response.content)
-        # Grep error_message to identify issue
-        err_msg = err_res_cont["error_message"]
-        print("\n    FAILURE - NSX DFW L4 Services with error: [%s]\n" %(err_msg))
+        if args.debug:
+            err_res_cont = json.loads(ex.response.content)
+            # Grep error_message to identify issue
+            err_msg = err_res_cont["error_message"]
+            print("\n    FAILURE - NSX DFW L4 Services with error: [%s]\n" %(err_msg))
+        else:
+            print("\n    FAILURE - NSX DFW L4 Services\n")
 
 ################################################################################
 ###  Restore NSX DFW L7 Context-Profile
@@ -265,10 +266,13 @@ def restore_nsx_dfw_context_profiles(backupfileprefix):
         rest_api_call(method='PATCH', endpoint = endpoint, data=body, debug=args.debug)
         print("\n   SUCCESS - NSX DFW L7 Services Restore")
     except Exception as ex:
-        err_res_cont = json.loads(ex.response.content)
-        # Grep error_message to identify issue
-        err_msg = err_res_cont["error_message"]
-        print("\n    FAILURE - NSX DFW L7 Services Restore with error: [%s]\n" %(err_msg))
+        if args.debug:
+            err_res_cont = json.loads(ex.response.content)
+            # Grep error_message to identify issue
+            err_msg = err_res_cont["error_message"]
+            print("\n    FAILURE - NSX DFW L7 Services Restore with error: [%s]\n" %(err_msg))
+        else:
+            print("\n    FAILURE - NSX DFW L7 Services Restore\n")
 
 ################################################################################
 ###  Restore NSX DFW Policy, Rules with GROUPS.
@@ -311,10 +315,13 @@ def restore_nsx_dfw_policy_n_group(backupfileprefix):
         rest_api_call(method='PATCH', endpoint = endpoint, data=body, debug=args.debug)
         print("\n   SUCCESS - NSX DFW Policy & Group Restore: %s Policy, %s Rules, %s Group\n" % (pcount, rcount, gcount))
     except Exception as ex:
-        err_res_cont = json.loads(ex.response.content)
-        # Grep error_message to identify issue
-        err_msg = err_res_cont["error_message"]
-        print("\n    FAILURE - NSX DFW Policy & Group Restore with error: [%s]\n" %(err_msg))
+        if args.debug:
+            err_res_cont = json.loads(ex.response.content)
+            # Grep error_message to identify issue
+            err_msg = err_res_cont["error_message"]
+            print("\n    FAILURE - NSX DFW Policy & Group Restore with error: [%s]\n" %(err_msg))
+        else:
+            print("\n    FAILURE - NSX DFW Policy & Group Restore\n")
 
 def restore_nsx_dfw_services_by_service(backupfileprefix):
     backupfile = (backupfileprefix+'-services-bkup.json')
@@ -344,10 +351,13 @@ def restore_nsx_dfw_services_by_service(backupfileprefix):
             print("SUCCESS - NSX DFW L4 Services - %s " %(body['children'][0]['Service']['relative_path']))
             success += 1
         except Exception as ex:
-            err_res_cont = json.loads(ex.response.content)
-            # Grep error_message to identify issue
-            err_msg = err_res_cont["error_message"]
-            print("FAILURE - NSX DFW L4 Services %s with error: [%s]" %(body['children'][0]['Service']['relative_path'], err_msg))
+            if args.debug:
+                err_res_cont = json.loads(ex.response.content)
+                # Grep error_message to identify issue
+                err_msg = err_res_cont["error_message"]
+                print("FAILURE - NSX DFW L4 Services %s with error: [%s]" %(body['children'][0]['Service']['relative_path'], err_msg))
+            else:
+                print("FAILURE - NSX DFW L4 Services %s" %(body['children'][0]['Service']['relative_path']))
             failure += 1
 
     print("Processed services with %s successes, and %s failures." %(success, failure))
@@ -388,10 +398,13 @@ def restore_nsx_dfw_policy_n_group_by_policy(backupfileprefix):
             print("SUCCESS - NSX DFW Policy & Group Restore: type [%s] and id [%s] " % (child['resource_type'], child['id']))
             success += 1
         except Exception as ex:
-            err_res_cont = json.loads(ex.response.content)
-            # Grep error_message to identify issue
-            err_msg = err_res_cont["error_message"]
-            print("FAILURE - NSX DFW Policy & Group Restore  type [%s] and id [%s] with error: [%s]" %(child['resource_type'], child['id'], err_msg))
+            if args.debug:
+                err_res_cont = json.loads(ex.response.content)
+                # Grep error_message to identify issue
+                err_msg = err_res_cont["error_message"]
+                print("FAILURE - NSX DFW Policy & Group Restore  type [%s] and id [%s] with error: [%s]" %(child['resource_type'], child['id'], err_msg))
+            else:
+                print("FAILURE - NSX DFW Policy & Group Restore  type [%s] and id [%s]" %(child['resource_type'], child['id']))
             failure += 1
 
 
@@ -427,10 +440,13 @@ def restore_nsx_dfw_context_profiles_by_profile(backupfileprefix):
             print("SUCCESS - NSX DFW L7 Services Restore - %s " %(body['children'][0]['PolicyContextProfile']['relative_path']))
             success += 1
         except Exception as ex:
-            err_res_cont = json.loads(ex.response.content)
-            # Grep error_message to identify issue
-            err_msg = err_res_cont["error_message"]
-            print("FAILURE - NSX DFW L7 Services Restore %s with error: [%s]" %(body['children'][0]['PolicyContextProfile']['relative_path'], err_msg))
+            if args.debug:
+                err_res_cont = json.loads(ex.response.content)
+                # Grep error_message to identify issue
+                err_msg = err_res_cont["error_message"]
+                print("FAILURE - NSX DFW L7 Services Restore %s with error: [%s]" %(body['children'][0]['PolicyContextProfile']['relative_path'], err_msg))
+            else:
+                print("FAILURE - NSX DFW L7 Services Restore %s" %(body['children'][0]['PolicyContextProfile']['relative_path']))
             failure += 1
 
     print("Processed services with %s successes, and %s failures." %(success, failure))

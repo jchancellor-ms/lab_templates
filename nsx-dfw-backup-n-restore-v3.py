@@ -87,24 +87,6 @@ def rest_api_call (method, endpoint, data=None, ip=args.ip, user=args.user, pass
         'Accept': 'application/json'
     }
     
-    # Debug output for request
-    if debug:
-        print("\n" + "="*80)
-        print("API CALL DEBUG INFO")
-        print("="*80)
-        print(f"Method: {method}")
-        print(f"URL: {url}")
-        print(f"User: {user}")
-        print(f"Headers: {headers}")
-        if data:
-            print(f"\nRequest Body (first 3000 chars):")
-            body_preview = data[:3000] + "..." if len(data) > 3000 else data
-            print(body_preview)
-            print(f"\nBody Length: {len(data)} characters")
-        else:
-            print("\nRequest Body: None")
-        print("="*80 + "\n")
-    
     res = requests.request(
         method=method,
         url=url,
@@ -114,17 +96,32 @@ def rest_api_call (method, endpoint, data=None, ip=args.ip, user=args.user, pass
         verify=False
     )
     
-    # Debug output for response
-    if debug:
+    # Only show debug output if there's an error (non-200 status)
+    if debug and res.status_code != 200:
         print("\n" + "="*80)
-        print("API RESPONSE DEBUG INFO")
+        print("API CALL DEBUG INFO (ERROR DETECTED)")
         print("="*80)
+        print(f"Method: {method}")
+        print(f"URL: {url}")
+        print(f"User: {user}")
+        print(f"Headers: {headers}")
+        if data:
+            print(f"\nRequest Body (first 5000 chars):")
+            body_preview = data[:5000] + "..." if len(data) > 5000 else data
+            print(body_preview)
+            print(f"\nBody Length: {len(data)} characters")
+        else:
+            print("\nRequest Body: None")
+        
+        print("\n" + "-"*80)
+        print("API RESPONSE DEBUG INFO")
+        print("-"*80)
         print(f"Status Code: {res.status_code}")
         print(f"Reason: {res.reason}")
         if len(res.content) > 0:
-            print(f"\nResponse Content (first 3000 chars):")
+            print(f"\nResponse Content (first 5000 chars):")
             content_str = res.content.decode('utf-8')
-            content_preview = content_str[:3000] + "..." if len(content_str) > 3000 else content_str
+            content_preview = content_str[:5000] + "..." if len(content_str) > 5000 else content_str
             print(content_preview)
             print(f"\nContent Length: {len(res.content)} bytes")
         print("="*80 + "\n")
@@ -132,7 +129,8 @@ def rest_api_call (method, endpoint, data=None, ip=args.ip, user=args.user, pass
     try:
         res.raise_for_status()
     except requests.exceptions.HTTPError as e:
-        if debug:
+        if debug and res.status_code == 200:
+            # Edge case: if we somehow get here with 200 status, show debug info
             print("\n" + "="*80)
             print("API ERROR DEBUG INFO")
             print("="*80)
